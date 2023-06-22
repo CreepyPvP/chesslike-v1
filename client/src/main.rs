@@ -21,3 +21,24 @@ fn main() {
         d.draw_text("Hello, world!", 12, 12, 20, Color::BLACK);
     }
 }
+
+// fn main() -> Result<(), TestError> {
+//     let mut stream = TcpStream::connect("127.0.0.1:3000")?;
+//
+//     let value = Incoming::Hello("Fck this shit".to_string());
+//     let encoded = bincode::serialize(&value).unwrap();
+//
+//     stream.write(&encoded)?;
+//
+//     std::thread::sleep(Duration::from_secs(5));
+//
+//     let value = Incoming::World(10);
+//     let encoded = bincode::serialize(&value).unwrap();
+//
+//     stream.write(&encoded)?;
+//
+//     std::thread::sleep(Duration::from_secs(10));
+//
+//     Ok(())
+// }
+//
