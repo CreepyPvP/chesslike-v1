@@ -5,11 +5,6 @@ networks:
     name: system
 
 services:
-  redis:
-    container_name: redis
-    image: redis
-    networks:
-      - system
   game-server1:
     container_name: game-server1
     build:

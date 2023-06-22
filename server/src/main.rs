@@ -1,26 +1,15 @@
-use ntex::web;
-
-use crate::server::GameServer;
+use error::AppError;
+use service::start_service;
 
 mod error;
-mod event;
-mod network;
-mod handling;
-mod server;
+mod service;
 
-#[ntex::main]
-async fn main() -> std::io::Result<()> {
-    let srv = GameServer::start();
+fn main() -> Result<(), AppError> {
     let port = 3000;
-    println!("Server listening on port: {}", port);
+    let service_thread = start_service(port).expect("Could not create service thread");
+    println!("Server listening on port: *{}", port);
 
-    web::server(move || {
-        web::App::new()
-            .wrap(web::middleware::Logger::default())
-            .state(srv.clone())
-            .service(network::ws_index)
-    })
-    .bind(format!("127.0.0.1:{}", port))?
-    .run()
-    .await
+    let _ = service_thread.join();
+
+    Ok(())
 }
