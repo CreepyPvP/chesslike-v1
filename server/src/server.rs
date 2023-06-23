@@ -3,23 +3,43 @@ use std::{
     thread,
 };
 
+use stub::packet::ServerPacket;
+
 use crate::error::AppError;
 
-pub struct Server {}
+pub struct Server {
+    id_counter: usize,
+}
 
 impl Server {
     fn new() -> Self {
-        Server {}
+        Server {
+            id_counter: 0,
+        }
     }
 
     fn handle(&mut self, msg: ServerMessage) {
-        println!("got message {:?}", msg);
+        match msg {
+            ServerMessage::Connect(client) => {
+                let _ = client.send(ClientMessage::Id(self.id_counter));
+                self.id_counter += 1;
+            },
+            ServerMessage::Disconnect(id) => println!("client disconnected {id}"),
+            ServerMessage::Packet(packet) => println!("got packet {:?}", packet), 
+        }
     }
 }
 
 #[derive(Debug)]
 pub enum ServerMessage {
-    Connect(Sender<usize>),
+    Connect(Sender<ClientMessage>),
+    Disconnect(usize),
+    Packet(ServerPacket),
+}
+
+#[derive(Debug)]
+pub enum ClientMessage {
+    Id(usize),
 }
 
 pub fn start_server() -> Result<Sender<ServerMessage>, AppError> {

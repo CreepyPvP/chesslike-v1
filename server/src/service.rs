@@ -6,7 +6,7 @@ use std::{
 };
 
 use stub::packet::ServerPacket;
-use crate::{error::AppError, server::ServerMessage};
+use crate::{error::AppError, server::{ServerMessage, ClientMessage}};
 
 pub fn start_service(
     port: usize,
@@ -18,7 +18,7 @@ pub fn start_service(
         // accept connections and process them serially
         for stream in listener.incoming() {
             match stream {
-                Ok(client) => handle_client(client, srv.clone()),
+                Ok(client) => handle_client(client, srv.clone())?,
                 Err(_) => (),
             };
         }
@@ -29,25 +29,31 @@ pub fn start_service(
     Ok(handle)
 }
 
-fn handle_client(mut client: TcpStream, srv: Sender<ServerMessage>) {
-    println!("Client connected");
-
-    let (tx, rx) = mpsc::channel::<usize>();
+fn handle_client(client: TcpStream, srv: Sender<ServerMessage>) -> Result<(), AppError> {
+    let (tx, rx) = mpsc::channel::<ClientMessage>();
     let _ = srv.send(ServerMessage::Connect(tx));
+
+    let id = match rx.recv() {
+        Ok(ClientMessage::Id(id)) => id,
+        _ => panic!("Server is a little stupid"),
+    };
+    println!("Client connected {id}");
+    
+    let mut reader = client.try_clone()?;
 
     thread::spawn(move || -> Result<(), AppError> {
         let mut buf = [0; 128];
 
         loop {
-            match client.read(&mut buf) {
+            match reader.read(&mut buf) {
                 Ok(len) => {
                     if len == 0 {
-                        println!("Client disconnected");
+                        let _ = srv.send(ServerMessage::Disconnect(id));
                         break;
                     }
-
-                    let value: ServerPacket = bincode::deserialize(&buf[0..len]).unwrap();
-                    // println!("received: {:?}", value);
+                    if let Ok(msg) = bincode::deserialize::<ServerPacket>(&buf[0..len]) {
+                        let _ = srv.send(ServerMessage::Packet(msg)); 
+                    }
                 }
                 Err(_) => {
                     println!("Error blocking thread");
@@ -60,7 +66,17 @@ fn handle_client(mut client: TcpStream, srv: Sender<ServerMessage>) {
     });
 
     thread::spawn(move || -> Result<(), AppError> {
-        client.write(&[0; 10]);
+        loop {
+            match rx.recv() {
+                Ok(msg) => {
+                    println!("got client msg: {:?}", msg)
+                },
+                Err(_) => break,
+            }
+        }
+        // let _ = client.write(&[0; 10]);
         Ok(())
     });
+
+    Ok(())
 }
