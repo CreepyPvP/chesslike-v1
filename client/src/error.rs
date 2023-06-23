@@ -2,7 +2,7 @@ use std::io;
 
 #[derive(Debug)]
 pub enum ClientError {
-    IoError(String),    
+    IoError(String),
 }
 
 impl From<io::Error> for ClientError {

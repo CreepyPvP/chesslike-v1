@@ -3,10 +3,20 @@ use std::{
     thread,
 };
 
+use stub::packet::ServerPacket;
+
 use crate::error::AppError;
 
+
+#[derive(Debug)]
+pub enum RoomMessage {
+    Join(usize),
+    Leave(usize),
+    Packet(usize, ServerPacket),
+}
+
 pub enum RoomState {
-    Waiting,
+    Lobby,
     Ingame,
 }
 
@@ -14,22 +24,23 @@ pub struct Room {
     state: RoomState,
 }
 
-#[derive(Debug)]
-pub enum RoomMessage {}
-
 impl Room {
     fn new() -> Self {
         Room {
-            state: RoomState::Waiting,
+            state: RoomState::Lobby,
         }
     }
 
     fn handle(&mut self, msg: RoomMessage) {
-        println!("Received message: {:?}", msg);
+        match msg {
+            RoomMessage::Join(user_id) => println!("user {user_id} joined room"),
+            RoomMessage::Leave(user_id) => println!("user {user_id} left room"),
+            RoomMessage::Packet(user_id, packet) => println!("got room packet {user_id} {:?}", packet),
+        }
     }
 }
 
-pub fn start_lobby() -> Result<Sender<RoomMessage>, AppError> {
+pub fn start_room(id: usize) -> Result<Sender<RoomMessage>, AppError> {
     let mut lobby = Room::new();
     let (tx, rx) = mpsc::channel::<RoomMessage>();
 

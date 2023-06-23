@@ -1,10 +1,9 @@
-use std::{time::Duration, net::TcpStream, io::Write};
 use error::ClientError;
 use raylib::prelude::*;
+use std::{io::Write, net::TcpStream, time::Duration};
 use stub::packet::ServerPacket;
 
 mod error;
-
 
 // fn main() {
 //     let (mut rl, thread) = raylib::init().size(640, 480).title("Hello, World").build();
@@ -31,13 +30,15 @@ mod error;
 fn main() -> Result<(), ClientError> {
     let mut stream = TcpStream::connect("127.0.0.1:3000")?;
 
-    let value = ServerPacket::Hello("Fck this shit".to_string());
+    let value = ServerPacket::CreateLobby;
     let encoded = bincode::serialize(&value).unwrap();
+    let bytes = stream.write(&encoded).unwrap();
+    println!("{bytes}");
 
-    stream.write(&encoded)?;
+    // std::thread::sleep(Duration::from_secs(1));
 
-    std::thread::sleep(Duration::from_secs(10));
+    let bytes = stream.write(&encoded).unwrap();
+    println!("{bytes}");
 
     Ok(())
 }
-

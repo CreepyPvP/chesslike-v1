@@ -1,12 +1,15 @@
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
-    sync::mpsc::{Sender, channel, self},
+    sync::mpsc::{self, channel, Sender},
     thread::{self, JoinHandle},
 };
 
+use crate::{
+    error::AppError,
+    server::{ClientMessage, ServerMessage},
+};
 use stub::packet::ServerPacket;
-use crate::{error::AppError, server::{ServerMessage, ClientMessage}};
 
 pub fn start_service(
     port: usize,
@@ -38,7 +41,7 @@ fn handle_client(client: TcpStream, srv: Sender<ServerMessage>) -> Result<(), Ap
         _ => panic!("Server is a little stupid"),
     };
     println!("Client connected {id}");
-    
+
     let mut reader = client.try_clone()?;
 
     thread::spawn(move || -> Result<(), AppError> {
@@ -52,7 +55,8 @@ fn handle_client(client: TcpStream, srv: Sender<ServerMessage>) -> Result<(), Ap
                         break;
                     }
                     if let Ok(msg) = bincode::deserialize::<ServerPacket>(&buf[0..len]) {
-                        let _ = srv.send(ServerMessage::Packet(msg)); 
+                        println!("difdjkf");
+                        let _ = srv.send(ServerMessage::Packet(id, msg));
                     }
                 }
                 Err(_) => {
@@ -65,18 +69,18 @@ fn handle_client(client: TcpStream, srv: Sender<ServerMessage>) -> Result<(), Ap
         Ok(())
     });
 
-    thread::spawn(move || -> Result<(), AppError> {
-        loop {
-            match rx.recv() {
-                Ok(msg) => {
-                    println!("got client msg: {:?}", msg)
-                },
-                Err(_) => break,
-            }
-        }
-        // let _ = client.write(&[0; 10]);
-        Ok(())
-    });
+    // thread::spawn(move || -> Result<(), AppError> {
+    //     loop {
+    //         match rx.recv() {
+    //             Ok(msg) => {
+    //                 println!("got client msg: {:?}", msg)
+    //             }
+    //             Err(_) => break,
+    //         }
+    //     }
+    //     // let _ = client.write(&[0; 10]);
+    //     Ok(())
+    // });
 
     Ok(())
 }
