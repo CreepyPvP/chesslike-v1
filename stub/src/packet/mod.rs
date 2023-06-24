@@ -6,3 +6,8 @@ pub enum ServerPacket {
     JoinLobby(usize),
     LeaveLobby,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum ClientPacket {
+    JoinLobby,
+}

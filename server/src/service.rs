@@ -32,7 +32,7 @@ pub fn start_service(
     Ok(handle)
 }
 
-fn handle_client(client: TcpStream, srv: Sender<ServerMessage>) -> Result<(), AppError> {
+fn handle_client(mut client: TcpStream, srv: Sender<ServerMessage>) -> Result<(), AppError> {
     let (tx, rx) = mpsc::channel::<ClientMessage>();
     let _ = srv.send(ServerMessage::Connect(tx));
 
@@ -72,7 +72,13 @@ fn handle_client(client: TcpStream, srv: Sender<ServerMessage>) -> Result<(), Ap
         loop {
             match rx.recv() {
                 Ok(msg) => {
-                    println!("got client msg: {:?}", msg)
+                    match msg {
+                        ClientMessage::Packet(packet) =>  {
+                            let encoded = bincode::serialize(&packet).unwrap();
+                            let _ = client.write(&encoded); 
+                        },
+                        _ => (),
+                    }
                 }
                 Err(_) => break,
             }

@@ -1,50 +1,72 @@
+use std::{
+    sync::{mpsc::channel, Arc, Mutex},
+    thread,
+};
+
+use client::{start_client, ClientMessage};
 use error::ClientError;
-use raylib::prelude::*;
-use std::{io::Write, net::TcpStream, time::Duration};
-use stub::packet::ServerPacket;
+use network::connect;
+use raylib::prelude::{Color, RaylibDraw};
 
+mod client;
 mod error;
+mod network;
 
-// fn main() {
-//     let (mut rl, thread) = raylib::init().size(640, 480).title("Hello, World").build();
-//
-//     let pos = Vector2 {
-//         x: rl.get_screen_width() as f32 / 2.0,
-//         y: rl.get_screen_height() as f32 / 2.0,
-//     };
-//
-//     while !rl.window_should_close() {
-//         let mut d = rl.begin_drawing(&thread);
-//
-//         d.draw_circle_v(pos, 50.0, Color::MAROON);
-//
-//         if d.is_mouse_button_pressed(MouseButton::MOUSE_LEFT_BUTTON) {
-//             println!("left click pressed");
-//         }
-//
-//         d.clear_background(Color::WHITE);
-//         d.draw_text("Hello, world!", 12, 12, 20, Color::BLACK);
-//     }
-// }
+pub enum AppState {
+    Idle,
+    Lobby,
+    Ingame,
+}
+
+pub struct AppData {
+    pub state: AppState,
+}
+
+impl Default for AppData {
+    fn default() -> Self {
+        AppData {
+            state: AppState::Idle,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct AppContext(Arc<Mutex<AppData>>);
+
+impl AppContext {
+    fn new(data: AppData) -> Self {
+        AppContext(Arc::new(Mutex::new(data)))
+    }
+}
 
 fn main() -> Result<(), ClientError> {
-    let mut stream = TcpStream::connect("127.0.0.1:3000")?;
+    let (mut rl, thread) = raylib::init().size(640, 480).title("Hello, World").build();
 
-    let value = ServerPacket::CreateLobby;
-    let encoded = bincode::serialize(&value).unwrap();
-    let bytes = stream.write(&encoded).unwrap();
-    println!("{bytes}");
+    let context = AppContext::new(AppData::default());
 
-    std::thread::sleep(Duration::from_secs(10));
+    let (tx, rx) = channel();
+    let connection = connect("127.0.0.1:3000", tx.clone())?;
 
-    let value = ServerPacket::LeaveLobby;
-    let encoded = bincode::serialize(&value).unwrap();
-    let bytes = stream.write(&encoded).unwrap();
-    println!("{bytes}");
+    let client_context = context.clone();
+    thread::spawn(move || {
+        start_client(rx, client_context, connection);
+    });
 
-    std::thread::sleep(Duration::from_secs(10));
-    // let bytes = stream.write(&encoded).unwrap();
-    // println!("{bytes}");
+    while !rl.window_should_close() {
+        if rl.is_key_pressed(raylib::prelude::KeyboardKey::KEY_A) {
+            let _ = tx.send(ClientMessage::CreateLobby);
+        }
+
+        let mut d = rl.begin_drawing(&thread);
+
+        d.clear_background(Color::WHITE);
+
+        match context.0.lock().unwrap().state {
+            AppState::Idle => d.draw_text("Hello, world!", 12, 12, 20, Color::BLACK),
+            AppState::Lobby => d.draw_text("Now in lobby", 12, 12, 20, Color::BLACK),
+            AppState::Ingame => d.draw_text("Now ingame", 12, 12, 20, Color::BLACK),
+        }
+    }
 
     Ok(())
 }

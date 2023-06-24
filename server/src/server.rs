@@ -4,7 +4,7 @@ use std::{
     thread,
 };
 
-use stub::packet::ServerPacket;
+use stub::packet::{ClientPacket, ServerPacket};
 
 use crate::{
     error::AppError,
@@ -22,6 +22,7 @@ pub enum ServerMessage {
 #[derive(Debug)]
 pub enum ClientMessage {
     Id(usize),
+    Packet(ClientPacket),
 }
 
 pub fn start_server() -> Result<Sender<ServerMessage>, AppError> {
@@ -96,15 +97,11 @@ impl Server {
                     return Ok(());
                 }
 
-                let lobby_id = self.room_id_counter;
+                let room_id = self.room_id_counter;
                 self.room_id_counter += 1;
-                let lobby = start_room(lobby_id, self.srv.clone())?;
-                let _ = lobby.send(RoomMessage::Join(
-                    user_id,
-                    self.user_sender.get(&user_id).unwrap().clone(),
-                ));
-                self.users.insert(user_id, lobby_id);
-                self.rooms.insert(lobby_id, lobby);
+                let room = start_room(room_id, self.srv.clone())?;
+                self.user_join_room(user_id, room_id, &room);
+                self.rooms.insert(room_id, room.clone());
             }
             ServerPacket::LeaveLobby => {
                 let room_id = match self.users.get(&user_id) {
@@ -124,12 +121,9 @@ impl Server {
                 let room = match self.rooms.get(&room_id) {
                     Some(room) => room,
                     None => return Ok(()),
-                };
-                let _ = room.send(RoomMessage::Join(
-                    user_id,
-                    self.user_sender.get(&user_id).unwrap().clone(),
-                ));
-                self.users.insert(user_id, room_id);
+                }
+                .clone();
+                self.user_join_room(user_id, room_id, &room);
             }
             packet => {
                 if let Some(room_id) = self.users.get(&user_id) {
@@ -144,5 +138,13 @@ impl Server {
         }
 
         Ok(())
+    }
+
+    fn user_join_room(&mut self, user_id: usize, room_id: usize, room: &Sender<RoomMessage>) {
+        let user = self.user_sender.get(&user_id).unwrap();
+        let _ = room.send(RoomMessage::Join(user_id, user.clone()));
+        self.users.insert(user_id, room_id);
+
+        let _ = user.send(ClientMessage::Packet(ClientPacket::JoinLobby));
     }
 }
