@@ -34,8 +34,10 @@ pub fn start_server() -> Result<Sender<ServerMessage>, AppError> {
 pub struct Server {
     user_id_counter: usize,
     room_id_counter: usize,
+
     // userid -> roomid
     users: HashMap<usize, usize>,
+    user_sender: HashMap<usize, Sender<ClientMessage>>,
     rooms: HashMap<usize, Sender<RoomMessage>>
 }
 
@@ -44,6 +46,7 @@ impl Server {
         Server { 
             user_id_counter: 0,
             room_id_counter: 0,
+            user_sender: HashMap::new(),
             users: HashMap::new(),
             rooms: HashMap::new(),
         }
@@ -52,13 +55,16 @@ impl Server {
     fn handle(&mut self, msg: ServerMessage) -> Result<(), AppError> {
         match msg {
             ServerMessage::Connect(client) => {
-                let _ = client.send(ClientMessage::Id(self.user_id_counter));
+                let id = self.user_id_counter;
                 self.user_id_counter += 1;
+                let _ = client.send(ClientMessage::Id(id));
+                self.user_sender.insert(id, client);
             }
             ServerMessage::Disconnect(id) => {
                 if let Some(room_id) = self.users.get(&id) {
                     let _ = self.rooms.get(&room_id).unwrap().send(RoomMessage::Leave(id));
                 }
+                self.user_sender.remove(&id);
                 println!("client disconnected {id}");
             },
             ServerMessage::Packet(id, packet) => self.handle_user_packet(id, packet)?,
@@ -68,13 +74,6 @@ impl Server {
     }
 
     fn handle_user_packet(&mut self, user_id: usize, packet: ServerPacket) -> Result<(), AppError> {
-        println!("handling user packet");
-        if let Some(room_id) = self.users.get(&user_id) {
-            println!("sending room message");
-            let _ = self.rooms.get(room_id).unwrap().send(RoomMessage::Packet(user_id, packet));
-            return Ok(());
-        }
-
         match packet {
             ServerPacket::CreateLobby => {
                 if self.users.get(&user_id).is_some() {
@@ -84,10 +83,26 @@ impl Server {
                 let lobby_id = self.room_id_counter;
                 self.room_id_counter += 1;
                 let lobby = start_room(lobby_id)?;
-                let _ = lobby.send(RoomMessage::Join(user_id));
+                let _ = lobby.send(RoomMessage::Join(user_id, self.user_sender.get(&user_id).unwrap().clone()));
                 self.users.insert(user_id, lobby_id);
                 self.rooms.insert(lobby_id, lobby);
-            }
+            },
+            ServerPacket::LeaveLobby => {
+                let room_id = match self.users.get(&user_id) {
+                    Some(room_id) => room_id,
+                    None => return Ok(()),
+                };
+
+                let room = self.rooms.get(&room_id).unwrap();
+                let _ = room.send(RoomMessage::Leave(user_id));
+                self.users.remove(&user_id);
+            },
+            packet => {
+                if let Some(room_id) = self.users.get(&user_id) {
+                    let _ = self.rooms.get(room_id).unwrap().send(RoomMessage::Packet(user_id, packet));
+                    return Ok(());
+                }
+            },
         }
 
         Ok(())

@@ -55,7 +55,6 @@ fn handle_client(client: TcpStream, srv: Sender<ServerMessage>) -> Result<(), Ap
                         break;
                     }
                     if let Ok(msg) = bincode::deserialize::<ServerPacket>(&buf[0..len]) {
-                        println!("difdjkf");
                         let _ = srv.send(ServerMessage::Packet(id, msg));
                     }
                 }
@@ -69,18 +68,18 @@ fn handle_client(client: TcpStream, srv: Sender<ServerMessage>) -> Result<(), Ap
         Ok(())
     });
 
-    // thread::spawn(move || -> Result<(), AppError> {
-    //     loop {
-    //         match rx.recv() {
-    //             Ok(msg) => {
-    //                 println!("got client msg: {:?}", msg)
-    //             }
-    //             Err(_) => break,
-    //         }
-    //     }
-    //     // let _ = client.write(&[0; 10]);
-    //     Ok(())
-    // });
+    thread::spawn(move || -> Result<(), AppError> {
+        loop {
+            match rx.recv() {
+                Ok(msg) => {
+                    println!("got client msg: {:?}", msg)
+                }
+                Err(_) => break,
+            }
+        }
+        // let _ = client.write(&[0; 10]);
+        Ok(())
+    });
 
     Ok(())
 }

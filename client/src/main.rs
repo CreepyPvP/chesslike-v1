@@ -35,10 +35,16 @@ fn main() -> Result<(), ClientError> {
     let bytes = stream.write(&encoded).unwrap();
     println!("{bytes}");
 
-    // std::thread::sleep(Duration::from_secs(1));
+    std::thread::sleep(Duration::from_secs(10));
 
+    let value = ServerPacket::LeaveLobby;
+    let encoded = bincode::serialize(&value).unwrap();
     let bytes = stream.write(&encoded).unwrap();
     println!("{bytes}");
+
+    std::thread::sleep(Duration::from_secs(10));
+    // let bytes = stream.write(&encoded).unwrap();
+    // println!("{bytes}");
 
     Ok(())
 }
