@@ -12,6 +12,7 @@ pub enum ServerMessage {
     Connect(Sender<ClientMessage>),
     Disconnect(usize),
     Packet(usize, ServerPacket),
+    RemoveRoom(usize),
 }
 
 #[derive(Debug)]
@@ -20,8 +21,8 @@ pub enum ClientMessage {
 }
 
 pub fn start_server() -> Result<Sender<ServerMessage>, AppError> {
-    let mut server = Server::new();
     let (tx, rx) = mpsc::channel::<ServerMessage>();
+    let mut server = Server::new(tx.clone());
     thread::spawn(move || loop {
         match rx.recv() {
             Ok(msg) => server.handle(msg).unwrap(),
@@ -32,18 +33,22 @@ pub fn start_server() -> Result<Sender<ServerMessage>, AppError> {
 }
 
 pub struct Server {
+    srv: Sender<ServerMessage>,
+
     user_id_counter: usize,
     room_id_counter: usize,
 
     // userid -> roomid
     users: HashMap<usize, usize>,
     user_sender: HashMap<usize, Sender<ClientMessage>>,
-    rooms: HashMap<usize, Sender<RoomMessage>>
+
+    rooms: HashMap<usize, Sender<RoomMessage>>,
 }
 
 impl Server {
-    fn new() -> Self {
+    fn new(srv: Sender<ServerMessage>) -> Self {
         Server { 
+            srv,
             user_id_counter: 0,
             room_id_counter: 0,
             user_sender: HashMap::new(),
@@ -68,6 +73,9 @@ impl Server {
                 println!("client disconnected {id}");
             },
             ServerMessage::Packet(id, packet) => self.handle_user_packet(id, packet)?,
+            ServerMessage::RemoveRoom(room_id) => {
+                self.rooms.remove(&room_id);
+            },
         }
 
         Ok(())
@@ -82,7 +90,7 @@ impl Server {
 
                 let lobby_id = self.room_id_counter;
                 self.room_id_counter += 1;
-                let lobby = start_room(lobby_id)?;
+                let lobby = start_room(lobby_id, self.srv.clone())?;
                 let _ = lobby.send(RoomMessage::Join(user_id, self.user_sender.get(&user_id).unwrap().clone()));
                 self.users.insert(user_id, lobby_id);
                 self.rooms.insert(lobby_id, lobby);
@@ -96,6 +104,18 @@ impl Server {
                 let room = self.rooms.get(&room_id).unwrap();
                 let _ = room.send(RoomMessage::Leave(user_id));
                 self.users.remove(&user_id);
+            },
+            ServerPacket::JoinLobby(room_id) => {
+                if self.users.get(&user_id).is_some() {
+                    return Ok(());
+                }
+
+                let room = match self.rooms.get(&room_id) {
+                    Some(room) => room,
+                    None => return Ok(()),
+                };
+                let _ = room.send(RoomMessage::Join(user_id, self.user_sender.get(&user_id).unwrap().clone()));
+                self.users.insert(user_id, room_id);
             },
             packet => {
                 if let Some(room_id) = self.users.get(&user_id) {

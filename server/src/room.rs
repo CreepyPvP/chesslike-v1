@@ -5,7 +5,7 @@ use std::{
 
 use stub::packet::ServerPacket;
 
-use crate::{error::AppError, server::ClientMessage};
+use crate::{error::AppError, server::{ClientMessage, ServerMessage}};
 
 
 #[derive(Debug)]
@@ -23,13 +23,17 @@ pub enum RoomState {
 pub struct Room {
     state: RoomState,
     users: HashMap<usize, Sender<ClientMessage>>,
+    srv: Sender<ServerMessage>,
+    id: usize,
 }
 
 impl Room {
-    fn new() -> Self {
+    fn new(srv: Sender<ServerMessage>, id: usize) -> Self {
         Room {
             state: RoomState::Lobby,
             users: HashMap::new(),
+            srv,
+            id,
         }
     }
 
@@ -43,6 +47,7 @@ impl Room {
                 self.users.remove(&user_id);
                 if self.users.len() == 0 {
                     println!("no users left; closing room");
+                    let _ = self.srv.send(ServerMessage::RemoveRoom(self.id));
                     return true;
                 }
             },
@@ -53,8 +58,8 @@ impl Room {
     }
 }
 
-pub fn start_room(_: usize) -> Result<Sender<RoomMessage>, AppError> {
-    let mut lobby = Room::new();
+pub fn start_room(id: usize, srv: Sender<ServerMessage>) -> Result<Sender<RoomMessage>, AppError> {
+    let mut lobby = Room::new(srv, id);
     let (tx, rx) = mpsc::channel::<RoomMessage>();
 
     let _ = thread::spawn(move || loop {
