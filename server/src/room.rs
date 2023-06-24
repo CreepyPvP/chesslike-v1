@@ -1,12 +1,15 @@
 use std::{
+    collections::HashMap,
     sync::mpsc::{self, Sender},
-    thread, collections::HashMap,
+    thread,
 };
 
 use stub::packet::ServerPacket;
 
-use crate::{error::AppError, server::{ClientMessage, ServerMessage}};
-
+use crate::{
+    error::AppError,
+    server::{ClientMessage, ServerMessage},
+};
 
 #[derive(Debug)]
 pub enum RoomMessage {
@@ -42,7 +45,7 @@ impl Room {
             RoomMessage::Join(user_id, client) => {
                 self.users.insert(user_id, client);
                 println!("user joined room. {} users in room", self.users.len());
-            },
+            }
             RoomMessage::Leave(user_id) => {
                 self.users.remove(&user_id);
                 if self.users.len() == 0 {
@@ -50,8 +53,10 @@ impl Room {
                     let _ = self.srv.send(ServerMessage::RemoveRoom(self.id));
                     return true;
                 }
-            },
-            RoomMessage::Packet(user_id, packet) => println!("got room packet {user_id} {:?}", packet),
+            }
+            RoomMessage::Packet(user_id, packet) => {
+                println!("got room packet {user_id} {:?}", packet)
+            }
         }
 
         false
@@ -68,7 +73,7 @@ pub fn start_room(id: usize, srv: Sender<ServerMessage>) -> Result<Sender<RoomMe
                 if lobby.handle(msg) {
                     break;
                 }
-            },
+            }
             Err(_) => break,
         };
     });
