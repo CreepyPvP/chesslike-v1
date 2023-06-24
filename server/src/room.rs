@@ -49,7 +49,7 @@ impl Room {
             RoomMessage::Leave(user_id) => {
                 self.users.remove(&user_id);
                 if self.users.len() == 0 {
-                    println!("no users left; closing room");
+                    println!("closing room");
                     let _ = self.srv.send(ServerMessage::RemoveRoom(self.id));
                     return true;
                 }

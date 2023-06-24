@@ -1,12 +1,12 @@
 use std::{
     sync::{mpsc::channel, Arc, Mutex},
-    thread,
+    thread, ffi::{CStr, CString},
 };
 
 use client::{start_client, ClientMessage};
 use error::ClientError;
 use network::connect;
-use raylib::prelude::{Color, RaylibDraw};
+use raylib::{prelude::{Color, RaylibDraw}, ffi::{GuiButton, Rectangle}, rgui::RaylibDrawGui};
 
 mod client;
 mod error;
@@ -40,7 +40,10 @@ impl AppContext {
 }
 
 fn main() -> Result<(), ClientError> {
-    let (mut rl, thread) = raylib::init().size(640, 480).title("Hello, World").build();
+    let width = 640;
+    let height = 480;
+
+    let (mut rl, thread) = raylib::init().size(width, height).title("Hello, World").build();
 
     let context = AppContext::new(AppData::default());
 
@@ -53,17 +56,27 @@ fn main() -> Result<(), ClientError> {
     });
 
     while !rl.window_should_close() {
-        if rl.is_key_pressed(raylib::prelude::KeyboardKey::KEY_A) {
-            let _ = tx.send(ClientMessage::CreateLobby);
-        }
+        // if rl.is_key_pressed(raylib::prelude::KeyboardKey::KEY_A) {
+        //     let _ = tx.send(ClientMessage::CreateLobby);
+        // }
 
         let mut d = rl.begin_drawing(&thread);
 
         d.clear_background(Color::WHITE);
 
         match context.0.lock().unwrap().state {
-            AppState::Idle => d.draw_text("Hello, world!", 12, 12, 20, Color::BLACK),
-            AppState::Lobby => d.draw_text("Now in lobby", 12, 12, 20, Color::BLACK),
+            AppState::Idle => {
+                if d.gui_button(Rectangle{x: 20.0, y: 20.0, width: 100.0, height: 40.0}, Some(&CString::new("Create Lobby").unwrap())) {
+                    let _ = tx.send(ClientMessage::CreateLobby);
+                }
+                if d.gui_button(Rectangle{x: 20.0, y: 80.0, width: 100.0, height: 40.0}, Some(&CString::new("Join Lobby").unwrap())) {
+                    let _ = tx.send(ClientMessage::CreateLobby);
+                }
+                d.draw_text("Chesslike, play now!", width / 2, height / 2, 20, Color::BLACK);
+            },
+            AppState::Lobby => {
+                d.draw_text("Now in lobby", 12, 12, 20, Color::BLACK);
+            },
             AppState::Ingame => d.draw_text("Now ingame", 12, 12, 20, Color::BLACK),
         }
     }
