@@ -8,6 +8,8 @@ pub enum ClientMessage {
     Packet(ClientPacket),    
     Disconnected,
 
+    SetIdle(bool),
+
     CreateLobby,
 }
 
@@ -30,6 +32,9 @@ fn process_message(msg: ClientMessage, context: &mut AppContext, connection: &mu
         ClientMessage::Packet(ClientPacket::JoinLobby) => {
             println!("joined lobby");
             context.0.lock().unwrap().deref_mut().state = AppState::Lobby;
+        },
+        ClientMessage::SetIdle(lobby_search) => {
+            context.0.lock().unwrap().deref_mut().state = AppState::Idle(lobby_search);
         },
         _ => (),
     }
